@@ -1,13 +1,14 @@
 import React, { useState } from 'react';
-import { Plus, Search, Filter, Eye, Edit, Trash2, FileText, Wrench } from 'lucide-react';
+import { Plus, Search, Filter, Eye, Edit, Trash2, FileText, Wrench, CheckCircle, Clock, AlertCircle } from 'lucide-react';
 import AddRepairModal from '../components/Modals/AddRepairModal';
-import { useRepairRequests } from '../hooks/useSupabase';
+import { useRepairRequests, useSpareParts } from '../hooks/useSupabase';
 
 const Repairs: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [showAddModal, setShowAddModal] = useState(false);
-  const { repairs, loading, addRepair } = useRepairRequests();
+  const { repairs, loading, addRepair, updateRepairStatus, deleteRepair } = useRepairRequests();
+  const { refetch: refetchSpareParts } = useSpareParts();
 
   const handleAddRepair = async (newRepair: any) => {
     try {
@@ -25,15 +26,38 @@ const Repairs: React.FC = () => {
       };
 
       const usedParts = newRepair.used_parts?.map((part: any) => ({
-        spare_part_id: part.spare_part_id || 'temp-id',
+        spare_part_id: part.spare_part_id,
         quantity_used: part.quantity,
         price_at_time: part.price
       }));
 
       await addRepair(repairData, usedParts);
+      // تحديث قطع الغيار لإظهار الكميات الجديدة
+      refetchSpareParts();
     } catch (error) {
       console.error('Error adding repair:', error);
       alert('حدث خطأ في إضافة الإصلاح');
+    }
+  };
+
+  const handleStatusChange = async (repairId: string, newStatus: 'pending' | 'in_progress' | 'completed' | 'archived') => {
+    try {
+      await updateRepairStatus(repairId, newStatus);
+    } catch (error) {
+      console.error('Error updating repair status:', error);
+      alert('حدث خطأ في تحديث حالة الإصلاح');
+    }
+  };
+
+  const handleDeleteRepair = async (repairId: string) => {
+    if (window.confirm('هل أنت متأكد من حذف هذا الإصلاح؟ سيتم إرجاع القطع المستخدمة إلى المخزون.')) {
+      try {
+        await deleteRepair(repairId);
+        refetchSpareParts(); // تحديث المخزون بعد الحذف
+      } catch (error) {
+        console.error('Error deleting repair:', error);
+        alert('حدث خطأ في حذف الإصلاح');
+      }
     }
   };
 
@@ -51,18 +75,63 @@ const Repairs: React.FC = () => {
 
   const getStatusBadge = (status: string) => {
     const statusConfig = {
-      pending: { label: 'في الانتظار', class: 'bg-yellow-100 text-yellow-800' },
-      in_progress: { label: 'قيد التنفيذ', class: 'bg-blue-100 text-blue-800' },
-      completed: { label: 'مكتمل', class: 'bg-green-100 text-green-800' },
-      archived: { label: 'مؤرشف', class: 'bg-gray-100 text-gray-800' }
+      pending: { label: 'في الانتظار', class: 'bg-yellow-100 text-yellow-800', icon: Clock },
+      in_progress: { label: 'قيد التنفيذ', class: 'bg-blue-100 text-blue-800', icon: AlertCircle },
+      completed: { label: 'مكتمل', class: 'bg-green-100 text-green-800', icon: CheckCircle },
+      archived: { label: 'مؤرشف', class: 'bg-gray-100 text-gray-800', icon: FileText }
     };
     
     const config = statusConfig[status as keyof typeof statusConfig];
+    const IconComponent = config.icon;
+    
     return (
-      <span className={`px-3 py-1 rounded-full text-xs font-medium ${config.class}`}>
+      <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium ${config.class}`}>
+        <IconComponent className="w-3 h-3" />
         {config.label}
       </span>
     );
+  };
+
+  const getStatusActions = (repair: any) => {
+    const actions = [];
+    
+    if (repair.status === 'pending') {
+      actions.push(
+        <button
+          key="start"
+          onClick={() => handleStatusChange(repair.id, 'in_progress')}
+          className="text-xs bg-blue-600 text-white px-2 py-1 rounded hover:bg-blue-700 transition-colors"
+        >
+          بدء العمل
+        </button>
+      );
+    }
+    
+    if (repair.status === 'in_progress') {
+      actions.push(
+        <button
+          key="complete"
+          onClick={() => handleStatusChange(repair.id, 'completed')}
+          className="text-xs bg-green-600 text-white px-2 py-1 rounded hover:bg-green-700 transition-colors"
+        >
+          إكمال
+        </button>
+      );
+    }
+    
+    if (repair.status === 'completed') {
+      actions.push(
+        <button
+          key="archive"
+          onClick={() => handleStatusChange(repair.id, 'archived')}
+          className="text-xs bg-gray-600 text-white px-2 py-1 rounded hover:bg-gray-700 transition-colors"
+        >
+          أرشفة
+        </button>
+      );
+    }
+    
+    return actions;
   };
 
   if (loading) {
@@ -86,6 +155,57 @@ const Repairs: React.FC = () => {
           <Plus className="w-5 h-5" />
           إصلاح جديد
         </button>
+      </div>
+
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="bg-yellow-50 p-4 rounded-lg border border-yellow-200">
+          <div className="flex items-center gap-3">
+            <Clock className="w-8 h-8 text-yellow-600" />
+            <div>
+              <p className="text-sm text-yellow-600 font-medium">في الانتظار</p>
+              <p className="text-2xl font-bold text-yellow-800">
+                {repairs.filter(r => r.status === 'pending').length}
+              </p>
+            </div>
+          </div>
+        </div>
+        
+        <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+          <div className="flex items-center gap-3">
+            <AlertCircle className="w-8 h-8 text-blue-600" />
+            <div>
+              <p className="text-sm text-blue-600 font-medium">قيد التنفيذ</p>
+              <p className="text-2xl font-bold text-blue-800">
+                {repairs.filter(r => r.status === 'in_progress').length}
+              </p>
+            </div>
+          </div>
+        </div>
+        
+        <div className="bg-green-50 p-4 rounded-lg border border-green-200">
+          <div className="flex items-center gap-3">
+            <CheckCircle className="w-8 h-8 text-green-600" />
+            <div>
+              <p className="text-sm text-green-600 font-medium">مكتمل</p>
+              <p className="text-2xl font-bold text-green-800">
+                {repairs.filter(r => r.status === 'completed').length}
+              </p>
+            </div>
+          </div>
+        </div>
+        
+        <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+          <div className="flex items-center gap-3">
+            <FileText className="w-8 h-8 text-gray-600" />
+            <div>
+              <p className="text-sm text-gray-600 font-medium">مؤرشف</p>
+              <p className="text-2xl font-bold text-gray-800">
+                {repairs.filter(r => r.status === 'archived').length}
+              </p>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Filters */}
@@ -113,6 +233,7 @@ const Repairs: React.FC = () => {
               <option value="pending">في الانتظار</option>
               <option value="in_progress">قيد التنفيذ</option>
               <option value="completed">مكتمل</option>
+              <option value="archived">مؤرشف</option>
             </select>
           </div>
         </div>
@@ -128,6 +249,7 @@ const Repairs: React.FC = () => {
                   <th className="px-6 py-4 text-right text-sm font-semibold text-gray-900">العميل</th>
                   <th className="px-6 py-4 text-right text-sm font-semibold text-gray-900">الجهاز</th>
                   <th className="px-6 py-4 text-right text-sm font-semibold text-gray-900">العطل</th>
+                  <th className="px-6 py-4 text-right text-sm font-semibold text-gray-900">القطع المستخدمة</th>
                   <th className="px-6 py-4 text-right text-sm font-semibold text-gray-900">التكلفة</th>
                   <th className="px-6 py-4 text-right text-sm font-semibold text-gray-900">الربح</th>
                   <th className="px-6 py-4 text-right text-sm font-semibold text-gray-900">الحالة</th>
@@ -152,20 +274,54 @@ const Repairs: React.FC = () => {
                     </td>
                     <td className="px-6 py-4">
                       <p className="text-gray-900">{repair.issue_type}</p>
+                      {repair.description && (
+                        <p className="text-sm text-gray-600 mt-1">{repair.description}</p>
+                      )}
                     </td>
                     <td className="px-6 py-4">
-                      <p className="font-medium text-gray-900">{repair.total_cost} د.ت</p>
+                      {repair.repair_parts && repair.repair_parts.length > 0 ? (
+                        <div className="space-y-1">
+                          {repair.repair_parts.map((part, index) => (
+                            <div key={index} className="text-sm">
+                              <span className="text-gray-900">{part.spare_part?.name || 'قطعة محذوفة'}</span>
+                              <span className="text-gray-600"> × {part.quantity_used}</span>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <span className="text-gray-500 text-sm">لا توجد قطع</span>
+                      )}
+                    </td>
+                    <td className="px-6 py-4">
+                      <div>
+                        <p className="font-medium text-gray-900">{repair.total_cost} د.ت</p>
+                        {repair.labor_cost > 0 && (
+                          <p className="text-sm text-gray-600">عمالة: {repair.labor_cost} د.ت</p>
+                        )}
+                      </div>
                     </td>
                     <td className="px-6 py-4">
                       <p className="font-medium text-green-600">{repair.profit} د.ت</p>
                     </td>
                     <td className="px-6 py-4">
-                      {getStatusBadge(repair.status)}
+                      <div className="space-y-2">
+                        {getStatusBadge(repair.status)}
+                        <div className="flex gap-1">
+                          {getStatusActions(repair)}
+                        </div>
+                      </div>
                     </td>
                     <td className="px-6 py-4">
-                      <p className="text-sm text-gray-600">
-                        {new Date(repair.created_at).toLocaleDateString('ar-EG')}
-                      </p>
+                      <div>
+                        <p className="text-sm text-gray-600">
+                          {new Date(repair.created_at).toLocaleDateString('ar-EG')}
+                        </p>
+                        {repair.completed_at && (
+                          <p className="text-xs text-green-600">
+                            اكتمل: {new Date(repair.completed_at).toLocaleDateString('ar-EG')}
+                          </p>
+                        )}
+                      </div>
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-2">
@@ -178,7 +334,10 @@ const Repairs: React.FC = () => {
                         <button className="p-2 text-gray-400 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-colors">
                           <FileText className="w-4 h-4" />
                         </button>
-                        <button className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors">
+                        <button 
+                          onClick={() => handleDeleteRepair(repair.id)}
+                          className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                        >
                           <Trash2 className="w-4 h-4" />
                         </button>
                       </div>
