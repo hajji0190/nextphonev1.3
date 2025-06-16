@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Wrench, Plus, Trash2 } from 'lucide-react';
+import { X, Wrench, Plus, Trash2, AlertTriangle } from 'lucide-react';
 import { useBrands, useModels, useSpareParts } from '../../hooks/useSupabase';
 
 interface AddRepairModalProps {
@@ -32,6 +32,7 @@ const AddRepairModal: React.FC<AddRepairModalProps> = ({ isOpen, onClose, onAdd 
 
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [filteredModels, setFilteredModels] = useState(models);
+  const [availableParts, setAvailableParts] = useState(spareParts);
 
   const issueTypes = [
     'كسر الشاشة',
@@ -53,6 +54,18 @@ const AddRepairModal: React.FC<AddRepairModalProps> = ({ isOpen, onClose, onAdd 
     }
   }, [formData.device_brand_id, models]);
 
+  useEffect(() => {
+    if (formData.device_brand_id && formData.device_model_id) {
+      setAvailableParts(spareParts.filter(part => 
+        part.brand_id === formData.device_brand_id && 
+        part.model_id === formData.device_model_id &&
+        part.quantity > 0
+      ));
+    } else {
+      setAvailableParts(spareParts.filter(part => part.quantity > 0));
+    }
+  }, [formData.device_brand_id, formData.device_model_id, spareParts]);
+
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
 
@@ -62,6 +75,14 @@ const AddRepairModal: React.FC<AddRepairModalProps> = ({ isOpen, onClose, onAdd 
     if (!formData.device_model_id) newErrors.device_model_id = 'موديل الجهاز مطلوب';
     if (!formData.issue_type) newErrors.issue_type = 'نوع العطل مطلوب';
     if (formData.labor_cost < 0) newErrors.labor_cost = 'تكلفة العمالة يجب أن تكون أكبر من أو تساوي صفر';
+
+    // التحقق من توفر القطع في المخزون
+    usedParts.forEach((part, index) => {
+      const sparePart = spareParts.find(sp => sp.id === part.spare_part_id);
+      if (sparePart && part.quantity > sparePart.quantity) {
+        newErrors[`part_${index}`] = `الكمية المطلوبة (${part.quantity}) أكبر من المتوفر في المخزون (${sparePart.quantity})`;
+      }
+    });
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -73,6 +94,10 @@ const AddRepairModal: React.FC<AddRepairModalProps> = ({ isOpen, onClose, onAdd 
 
   const removeUsedPart = (index: number) => {
     setUsedParts(usedParts.filter((_, i) => i !== index));
+    // إزالة أخطاء هذه القطعة
+    const newErrors = { ...errors };
+    delete newErrors[`part_${index}`];
+    setErrors(newErrors);
   };
 
   const updateUsedPart = (index: number, field: string, value: any) => {
@@ -88,6 +113,13 @@ const AddRepairModal: React.FC<AddRepairModalProps> = ({ isOpen, onClose, onAdd 
     }
     
     setUsedParts(updated);
+    
+    // إزالة خطأ هذه القطعة عند التحديث
+    if (errors[`part_${index}`]) {
+      const newErrors = { ...errors };
+      delete newErrors[`part_${index}`];
+      setErrors(newErrors);
+    }
   };
 
   const calculateTotalCost = () => {
@@ -103,6 +135,11 @@ const AddRepairModal: React.FC<AddRepairModalProps> = ({ isOpen, onClose, onAdd 
       return sum + purchaseCost;
     }, 0);
     return totalCost - partsCost - (formData.labor_cost * 0.5);
+  };
+
+  const getAvailableQuantity = (partId: string) => {
+    const part = spareParts.find(p => p.id === partId);
+    return part ? part.quantity : 0;
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -286,55 +323,85 @@ const AddRepairModal: React.FC<AddRepairModalProps> = ({ isOpen, onClose, onAdd 
               </button>
             </div>
 
-            {usedParts.map((part, index) => (
-              <div key={index} className="grid grid-cols-1 md:grid-cols-4 gap-4 p-4 bg-gray-50 rounded-lg">
-                <div className="form-group">
-                  <label className="form-label">قطعة الغيار</label>
-                  <select
-                    value={part.spare_part_id}
-                    onChange={(e) => updateUsedPart(index, 'spare_part_id', e.target.value)}
-                    className="form-select"
-                  >
-                    <option value="">اختر قطعة الغيار</option>
-                    {spareParts.map(sparePart => (
-                      <option key={sparePart.id} value={sparePart.id}>
-                        {sparePart.name} - {sparePart.brand?.name} {sparePart.model?.name}
-                      </option>
-                    ))}
-                  </select>
+            {usedParts.map((part, index) => {
+              const availableQty = getAvailableQuantity(part.spare_part_id);
+              const selectedPart = spareParts.find(sp => sp.id === part.spare_part_id);
+              
+              return (
+                <div key={index} className="grid grid-cols-1 md:grid-cols-5 gap-4 p-4 bg-gray-50 rounded-lg">
+                  <div className="form-group">
+                    <label className="form-label">قطعة الغيار</label>
+                    <select
+                      value={part.spare_part_id}
+                      onChange={(e) => updateUsedPart(index, 'spare_part_id', e.target.value)}
+                      className="form-select"
+                    >
+                      <option value="">اختر قطعة الغيار</option>
+                      {availableParts.map(sparePart => (
+                        <option key={sparePart.id} value={sparePart.id}>
+                          {sparePart.name} - {sparePart.brand?.name} {sparePart.model?.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  
+                  <div className="form-group">
+                    <label className="form-label">الكمية</label>
+                    <input
+                      type="number"
+                      min="1"
+                      max={availableQty}
+                      value={part.quantity}
+                      onChange={(e) => updateUsedPart(index, 'quantity', parseInt(e.target.value) || 1)}
+                      className={`form-input ${errors[`part_${index}`] ? 'border-red-500' : ''}`}
+                    />
+                    {selectedPart && (
+                      <p className="text-xs text-gray-600 mt-1">
+                        متوفر: {availableQty}
+                      </p>
+                    )}
+                  </div>
+                  
+                  <div className="form-group">
+                    <label className="form-label">السعر (د.ت)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={part.price}
+                      onChange={(e) => updateUsedPart(index, 'price', parseFloat(e.target.value) || 0)}
+                      className="form-input"
+                    />
+                  </div>
+                  
+                  <div className="form-group">
+                    <label className="form-label">الإجمالي</label>
+                    <div className="form-input bg-gray-100 text-gray-700">
+                      {(part.quantity * part.price).toFixed(2)} د.ت
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-end">
+                    <button
+                      type="button"
+                      onClick={() => removeUsedPart(index)}
+                      className="p-3 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                  
+                  {errors[`part_${index}`] && (
+                    <div className="md:col-span-5">
+                      <div className="flex items-center gap-2 text-red-600 text-sm">
+                        <AlertTriangle className="w-4 h-4" />
+                        {errors[`part_${index}`]}
+                      </div>
+                    </div>
+                  )}
                 </div>
-                <div className="form-group">
-                  <label className="form-label">الكمية</label>
-                  <input
-                    type="number"
-                    min="1"
-                    value={part.quantity}
-                    onChange={(e) => updateUsedPart(index, 'quantity', parseInt(e.target.value) || 1)}
-                    className="form-input"
-                  />
-                </div>
-                <div className="form-group">
-                  <label className="form-label">السعر (د.ت)</label>
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    value={part.price}
-                    onChange={(e) => updateUsedPart(index, 'price', parseFloat(e.target.value) || 0)}
-                    className="form-input"
-                  />
-                </div>
-                <div className="flex items-end">
-                  <button
-                    type="button"
-                    onClick={() => removeUsedPart(index)}
-                    className="p-3 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
 
           {/* Cost Summary */}

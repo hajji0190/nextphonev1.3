@@ -95,6 +95,38 @@ const saveToStorage = <T>(key: string, value: T): void => {
   }
 };
 
+// دالة لتقليل كمية قطع الغيار
+const decreaseSparePartQuantity = (partId: string, quantityToDecrease: number): void => {
+  const spareParts = getFromStorage('spareParts', []);
+  const updatedParts = spareParts.map((part: SparePart) => {
+    if (part.id === partId) {
+      return {
+        ...part,
+        quantity: Math.max(0, part.quantity - quantityToDecrease),
+        updated_at: new Date().toISOString()
+      };
+    }
+    return part;
+  });
+  saveToStorage('spareParts', updatedParts);
+};
+
+// دالة لإرجاع كمية قطع الغيار (في حالة الحذف أو التعديل)
+const increaseSparePartQuantity = (partId: string, quantityToIncrease: number): void => {
+  const spareParts = getFromStorage('spareParts', []);
+  const updatedParts = spareParts.map((part: SparePart) => {
+    if (part.id === partId) {
+      return {
+        ...part,
+        quantity: part.quantity + quantityToIncrease,
+        updated_at: new Date().toISOString()
+      };
+    }
+    return part;
+  });
+  saveToStorage('spareParts', updatedParts);
+};
+
 // البيانات الافتراضية
 const defaultBrands: Brand[] = [
   { id: '1', name: 'Apple', created_at: new Date().toISOString() },
@@ -110,6 +142,50 @@ const defaultModels: Model[] = [
   { id: '3', name: 'Galaxy S24', brand_id: '2', created_at: new Date().toISOString() },
   { id: '4', name: 'Galaxy A54', brand_id: '2', created_at: new Date().toISOString() },
   { id: '5', name: 'P60 Pro', brand_id: '3', created_at: new Date().toISOString() },
+];
+
+const defaultSpareParts: SparePart[] = [
+  {
+    id: '1',
+    name: 'شاشة iPhone 15 Pro',
+    part_type: 'شاشة',
+    screen_quality: 'OLED',
+    brand_id: '1',
+    model_id: '1',
+    quantity: 10,
+    purchase_price: 800,
+    selling_price: 1200,
+    low_stock_alert: 5,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString()
+  },
+  {
+    id: '2',
+    name: 'بطارية Galaxy S24',
+    part_type: 'بطارية',
+    brand_id: '2',
+    model_id: '3',
+    quantity: 15,
+    purchase_price: 150,
+    selling_price: 250,
+    low_stock_alert: 5,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString()
+  },
+  {
+    id: '3',
+    name: 'شاشة iPhone 14',
+    part_type: 'شاشة',
+    screen_quality: 'OLED',
+    brand_id: '1',
+    model_id: '2',
+    quantity: 8,
+    purchase_price: 700,
+    selling_price: 1000,
+    low_stock_alert: 5,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString()
+  }
 ];
 
 const defaultSettings: WorkshopSettings = {
@@ -262,7 +338,7 @@ export const useSpareParts = () => {
   const { models } = useModels();
 
   useEffect(() => {
-    const storedParts = getFromStorage('spareParts', []);
+    const storedParts = getFromStorage('spareParts', defaultSpareParts);
     const partsWithRelations = storedParts.map((part: SparePart) => ({
       ...part,
       brand: brands.find(b => b.id === part.brand_id),
@@ -280,29 +356,45 @@ export const useSpareParts = () => {
       updated_at: new Date().toISOString()
     };
 
-    const updatedParts = [...spareParts, newSparePart];
-    setSpareParts(updatedParts);
+    const allParts = getFromStorage('spareParts', defaultSpareParts);
+    const updatedParts = [...allParts, newSparePart];
     saveToStorage('spareParts', updatedParts);
-    return newSparePart;
+    
+    const partWithRelations = {
+      ...newSparePart,
+      brand: brands.find(b => b.id === newSparePart.brand_id),
+      model: models.find(m => m.id === newSparePart.model_id)
+    };
+    
+    setSpareParts(prev => [...prev, partWithRelations]);
+    return partWithRelations;
   };
 
   const updateSparePart = async (id: string, updates: Partial<SparePart>): Promise<SparePart | null> => {
+    const allParts = getFromStorage('spareParts', defaultSpareParts);
+    const updatedAllParts = allParts.map((part: SparePart) => 
+      part.id === id ? { ...part, ...updates, updated_at: new Date().toISOString() } : part
+    );
+    saveToStorage('spareParts', updatedAllParts);
+    
     const updatedParts = spareParts.map(part => 
       part.id === id ? { ...part, ...updates, updated_at: new Date().toISOString() } : part
     );
     setSpareParts(updatedParts);
-    saveToStorage('spareParts', updatedParts);
     return updatedParts.find(p => p.id === id) || null;
   };
 
   const deleteSparePart = async (id: string): Promise<void> => {
+    const allParts = getFromStorage('spareParts', defaultSpareParts);
+    const updatedAllParts = allParts.filter((part: SparePart) => part.id !== id);
+    saveToStorage('spareParts', updatedAllParts);
+    
     const updatedParts = spareParts.filter(part => part.id !== id);
     setSpareParts(updatedParts);
-    saveToStorage('spareParts', updatedParts);
   };
 
   const refetch = () => {
-    const storedParts = getFromStorage('spareParts', []);
+    const storedParts = getFromStorage('spareParts', defaultSpareParts);
     const partsWithRelations = storedParts.map((part: SparePart) => ({
       ...part,
       brand: brands.find(b => b.id === part.brand_id),
@@ -322,13 +414,35 @@ export const useRepairRequests = () => {
   const { brands } = useBrands();
   const { models } = useModels();
 
+  // دالة لتحديث المخزون عند تغيير قطع الغيار
+  const updateInventoryForRepairParts = (
+    oldParts: RepairPart[] = [],
+    newParts: RepairPart[] = []
+  ) => {
+    // إرجاع الكميات القديمة إلى المخزون
+    oldParts.forEach(part => {
+      increaseSparePartQuantity(part.spare_part_id, part.quantity_used);
+    });
+
+    // خصم الكميات الجديدة من المخزون
+    newParts.forEach(part => {
+      decreaseSparePartQuantity(part.spare_part_id, part.quantity_used);
+    });
+  };
+
   useEffect(() => {
     const storedRepairs = getFromStorage('repairs', []);
-    const repairsWithRelations = storedRepairs.map((repair: RepairRequest) => ({
-      ...repair,
-      brand: brands.find(b => b.id === repair.device_brand_id),
-      model: models.find(m => m.id === repair.device_model_id)
-    }));
+    const storedRepairParts = getFromStorage('repairParts', []);
+    
+    const repairsWithRelations = storedRepairs.map((repair: RepairRequest) => {
+      const repairParts = storedRepairParts.filter((part: RepairPart) => part.repair_id === repair.id);
+      return {
+        ...repair,
+        brand: brands.find(b => b.id === repair.device_brand_id),
+        model: models.find(m => m.id === repair.device_model_id),
+        repair_parts: repairParts
+      };
+    });
     setRepairs(repairsWithRelations);
     setLoading(false);
   }, [brands, models]);
@@ -344,7 +458,7 @@ export const useRepairRequests = () => {
       updated_at: new Date().toISOString()
     };
 
-    // إضافة القطع المستخدمة
+    // إضافة القطع المستخدمة وتحديث المخزون
     if (usedParts && usedParts.length > 0) {
       const repairParts: RepairPart[] = usedParts.map(part => ({
         id: generateId(),
@@ -359,13 +473,27 @@ export const useRepairRequests = () => {
       const existingRepairParts = getFromStorage('repairParts', []);
       saveToStorage('repairParts', [...existingRepairParts, ...repairParts]);
       
+      // تقليل الكمية من المخزون
+      repairParts.forEach(part => {
+        decreaseSparePartQuantity(part.spare_part_id, part.quantity_used);
+      });
+      
       newRepair.repair_parts = repairParts;
     }
 
-    const updatedRepairs = [newRepair, ...repairs];
-    setRepairs(updatedRepairs);
+    // حفظ الإصلاح
+    const allRepairs = getFromStorage('repairs', []);
+    const updatedRepairs = [newRepair, ...allRepairs];
     saveToStorage('repairs', updatedRepairs);
-    return newRepair;
+    
+    const repairWithRelations = {
+      ...newRepair,
+      brand: brands.find(b => b.id === newRepair.device_brand_id),
+      model: models.find(m => m.id === newRepair.device_model_id)
+    };
+    
+    setRepairs(prev => [repairWithRelations, ...prev]);
+    return repairWithRelations;
   };
 
   const updateRepairStatus = async (id: string, status: RepairRequest['status']): Promise<RepairRequest | null> => {
@@ -378,36 +506,109 @@ export const useRepairRequests = () => {
       updates.completed_at = new Date().toISOString();
     }
 
+    const allRepairs = getFromStorage('repairs', []);
+    const updatedAllRepairs = allRepairs.map((repair: RepairRequest) => 
+      repair.id === id ? { ...repair, ...updates } : repair
+    );
+    saveToStorage('repairs', updatedAllRepairs);
+
     const updatedRepairs = repairs.map(repair => 
       repair.id === id ? { ...repair, ...updates } : repair
     );
     setRepairs(updatedRepairs);
-    saveToStorage('repairs', updatedRepairs);
     return updatedRepairs.find(r => r.id === id) || null;
   };
 
-  const updateRepair = async (id: string, updates: Partial<RepairRequest>): Promise<RepairRequest | null> => {
+  const updateRepair = async (
+    id: string, 
+    updates: Partial<RepairRequest>,
+    newUsedParts?: { spare_part_id: string; quantity_used: number; price_at_time: number }[]
+  ): Promise<RepairRequest | null> => {
+    const currentRepair = repairs.find(r => r.id === id);
+    if (!currentRepair) return null;
+
+    // إذا تم تحديث القطع المستخدمة
+    if (newUsedParts !== undefined) {
+      const oldRepairParts = currentRepair.repair_parts || [];
+      
+      // إنشاء القطع الجديدة
+      const newRepairParts: RepairPart[] = newUsedParts.map(part => ({
+        id: generateId(),
+        repair_id: id,
+        spare_part_id: part.spare_part_id,
+        quantity_used: part.quantity_used,
+        price_at_time: part.price_at_time,
+        created_at: new Date().toISOString()
+      }));
+
+      // تحديث المخزون
+      updateInventoryForRepairParts(oldRepairParts, newRepairParts);
+
+      // تحديث القطع المستخدمة في التخزين
+      const allRepairParts = getFromStorage('repairParts', []);
+      const filteredRepairParts = allRepairParts.filter((part: RepairPart) => part.repair_id !== id);
+      saveToStorage('repairParts', [...filteredRepairParts, ...newRepairParts]);
+
+      updates.repair_parts = newRepairParts;
+    }
+
+    const updatedRepairData = {
+      ...updates,
+      updated_at: new Date().toISOString()
+    };
+
+    // تحديث الإصلاح في التخزين
+    const allRepairs = getFromStorage('repairs', []);
+    const updatedAllRepairs = allRepairs.map((repair: RepairRequest) => 
+      repair.id === id ? { ...repair, ...updatedRepairData } : repair
+    );
+    saveToStorage('repairs', updatedAllRepairs);
+
     const updatedRepairs = repairs.map(repair => 
-      repair.id === id ? { ...repair, ...updates, updated_at: new Date().toISOString() } : repair
+      repair.id === id ? { ...repair, ...updatedRepairData } : repair
     );
     setRepairs(updatedRepairs);
-    saveToStorage('repairs', updatedRepairs);
     return updatedRepairs.find(r => r.id === id) || null;
   };
 
   const deleteRepair = async (id: string): Promise<void> => {
+    const repairToDelete = repairs.find(r => r.id === id);
+    if (!repairToDelete) return;
+
+    // إرجاع القطع المستخدمة إلى المخزون
+    if (repairToDelete.repair_parts && repairToDelete.repair_parts.length > 0) {
+      repairToDelete.repair_parts.forEach(part => {
+        increaseSparePartQuantity(part.spare_part_id, part.quantity_used);
+      });
+    }
+
+    // حذف القطع المستخدمة
+    const allRepairParts = getFromStorage('repairParts', []);
+    const filteredRepairParts = allRepairParts.filter((part: RepairPart) => part.repair_id !== id);
+    saveToStorage('repairParts', filteredRepairParts);
+
+    // حذف الإصلاح
+    const allRepairs = getFromStorage('repairs', []);
+    const updatedAllRepairs = allRepairs.filter((repair: RepairRequest) => repair.id !== id);
+    saveToStorage('repairs', updatedAllRepairs);
+
     const updatedRepairs = repairs.filter(repair => repair.id !== id);
     setRepairs(updatedRepairs);
-    saveToStorage('repairs', updatedRepairs);
   };
 
   const refetch = () => {
     const storedRepairs = getFromStorage('repairs', []);
-    const repairsWithRelations = storedRepairs.map((repair: RepairRequest) => ({
-      ...repair,
-      brand: brands.find(b => b.id === repair.device_brand_id),
-      model: models.find(m => m.id === repair.device_model_id)
-    }));
+    const storedRepairParts = getFromStorage('repairParts', []);
+    
+    const repairsWithRelations = storedRepairs.map((repair: RepairRequest) => {
+      const repairParts = storedRepairParts.filter((part: RepairPart) => part.repair_id === repair.id);
+      return {
+        ...repair,
+        brand: brands.find(b => b.id === repair.device_brand_id),
+        model: models.find(m => m.id === repair.device_model_id),
+        repair_parts: repairParts
+      };
+    });
     setRepairs(repairsWithRelations);
   };
 
