@@ -7,6 +7,10 @@
   direction: rtl;
 }
 
+[dir="ltr"] {
+  direction: ltr;
+}
+
 /* Custom scrollbar */
 ::-webkit-scrollbar {
   width: 6px;
@@ -102,11 +106,11 @@ body {
 }
 
 .card-header {
-  @apply p-6 border-b border-gray-200;
+  @apply p-4 sm:p-6 border-b border-gray-200;
 }
 
 .card-body {
-  @apply p-6;
+  @apply p-4 sm:p-6;
 }
 
 /* Status badges */
@@ -132,11 +136,11 @@ body {
 
 /* Modal styles */
 .modal-overlay {
-  @apply fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50;
+  @apply fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4;
 }
 
 .modal-content {
-  @apply bg-white rounded-xl shadow-xl max-w-lg w-full mx-4 max-h-[90vh] overflow-y-auto;
+  @apply bg-white rounded-xl shadow-xl max-w-lg w-full mx-auto max-h-[90vh] overflow-y-auto;
 }
 
 /* Form group */
@@ -149,15 +153,15 @@ body {
 }
 
 .form-input {
-  @apply w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500;
+  @apply w-full px-3 sm:px-4 py-2 sm:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm sm:text-base;
 }
 
 .form-select {
-  @apply w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white;
+  @apply w-full px-3 sm:px-4 py-2 sm:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-sm sm:text-base;
 }
 
 .form-textarea {
-  @apply w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-y;
+  @apply w-full px-3 sm:px-4 py-2 sm:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-y text-sm sm:text-base;
 }
 
 /* Utility classes */
@@ -198,4 +202,85 @@ body {
     opacity: 1;
     transform: translateX(0);
   }
+}
+
+/* Mobile optimizations */
+@media (max-width: 640px) {
+  .table-responsive {
+    font-size: 0.875rem;
+  }
+  
+  .table-responsive th,
+  .table-responsive td {
+    padding: 0.5rem;
+  }
+  
+  /* Hide less important columns on mobile */
+  .mobile-hidden {
+    display: none;
+  }
+  
+  /* Stack form elements on mobile */
+  .mobile-stack {
+    flex-direction: column;
+  }
+  
+  /* Reduce padding on mobile */
+  .mobile-p-2 {
+    padding: 0.5rem;
+  }
+  
+  .mobile-p-4 {
+    padding: 1rem;
+  }
+}
+
+/* Touch targets for mobile */
+@media (max-width: 768px) {
+  button, .btn, a[role="button"] {
+    min-height: 44px;
+    min-width: 44px;
+  }
+  
+  input, select, textarea {
+    min-height: 44px;
+  }
+}
+
+/* Responsive text sizes */
+.responsive-text-sm {
+  @apply text-xs sm:text-sm;
+}
+
+.responsive-text-base {
+  @apply text-sm sm:text-base;
+}
+
+.responsive-text-lg {
+  @apply text-base sm:text-lg;
+}
+
+.responsive-text-xl {
+  @apply text-lg sm:text-xl;
+}
+
+.responsive-text-2xl {
+  @apply text-xl sm:text-2xl;
+}
+
+/* Responsive spacing */
+.responsive-p-4 {
+  @apply p-3 sm:p-4;
+}
+
+.responsive-p-6 {
+  @apply p-4 sm:p-6;
+}
+
+.responsive-gap-4 {
+  @apply gap-3 sm:gap-4;
+}
+
+.responsive-gap-6 {
+  @apply gap-4 sm:gap-6;
 }

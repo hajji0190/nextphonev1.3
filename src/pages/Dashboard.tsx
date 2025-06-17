@@ -2,11 +2,14 @@ import React, { useState, useEffect } from 'react';
 import { DollarSign, Package, Wrench, TrendingUp } from 'lucide-react';
 import StatsCard from '../components/Dashboard/StatsCard';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
-import { useRepairRequests } from '../hooks/useSupabase';
+import { useRepairRequests } from '../hooks/useFirebaseData';
+import { useLanguage } from '../contexts/LanguageContext';
 
 const Dashboard: React.FC = () => {
   const [dateFilter, setDateFilter] = useState('month');
   const { repairs, loading } = useRepairRequests();
+  const { t } = useLanguage();
+  
   const [stats, setStats] = useState({
     total_revenue: 0,
     total_cost: 0,
@@ -75,7 +78,10 @@ const Dashboard: React.FC = () => {
   };
 
   const calculateWeeklyProfits = (repairs: any[]) => {
-    const days = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
+    const days = [
+      t('days.sunday'), t('days.monday'), t('days.tuesday'), t('days.wednesday'),
+      t('days.thursday'), t('days.friday'), t('days.saturday')
+    ];
     const weeklyData = days.map(day => ({ name: day, profit: 0 }));
 
     const now = new Date();
@@ -96,7 +102,7 @@ const Dashboard: React.FC = () => {
     const modelCounts: { [key: string]: number } = {};
     
     repairs.forEach((repair) => {
-      const modelName = repair.model?.name || 'غير محدد';
+      const modelName = repair.model?.name || t('common.noData');
       modelCounts[modelName] = (modelCounts[modelName] || 0) + 1;
     });
 
@@ -116,7 +122,7 @@ const Dashboard: React.FC = () => {
     const issueCounts: { [key: string]: number } = {};
     
     repairs.forEach((repair) => {
-      const issue = repair.issue_type || 'غير محدد';
+      const issue = repair.issue_type || t('common.noData');
       issueCounts[issue] = (issueCounts[issue] || 0) + 1;
     });
 
@@ -135,49 +141,49 @@ const Dashboard: React.FC = () => {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <h1 className="text-2xl font-bold text-gray-900">لوحة التحكم</h1>
+        <h1 className="text-xl sm:text-2xl font-bold text-gray-900">{t('dashboard.title')}</h1>
         
         <div className="flex gap-2">
           <select
             value={dateFilter}
             onChange={(e) => setDateFilter(e.target.value)}
-            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            className="px-3 sm:px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
           >
-            <option value="today">اليوم</option>
-            <option value="week">هذا الأسبوع</option>
-            <option value="month">هذا الشهر</option>
+            <option value="today">{t('time.today')}</option>
+            <option value="week">{t('time.week')}</option>
+            <option value="month">{t('time.month')}</option>
           </select>
         </div>
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
         <StatsCard
-          title="إجمالي الإيرادات"
-          value={`${stats.total_revenue.toLocaleString()} د.ت`}
+          title={t('dashboard.totalRevenue')}
+          value={`${stats.total_revenue.toLocaleString()} ${t('currency')}`}
           icon={DollarSign}
           color="blue"
         />
         
         <StatsCard
-          title="تكلفة القطع"
-          value={`${stats.total_cost.toLocaleString()} د.ت`}
+          title={t('dashboard.totalCost')}
+          value={`${stats.total_cost.toLocaleString()} ${t('currency')}`}
           icon={Package}
           color="red"
         />
         
         <StatsCard
-          title="صافي الأرباح"
-          value={`${stats.net_profit.toLocaleString()} د.ت`}
+          title={t('dashboard.netProfit')}
+          value={`${stats.net_profit.toLocaleString()} ${t('currency')}`}
           icon={TrendingUp}
           color="green"
         />
         
         <StatsCard
-          title="عدد الإصلاحات"
+          title={t('dashboard.totalRepairs')}
           value={stats.total_repairs}
           icon={Wrench}
           color="purple"
@@ -185,27 +191,30 @@ const Dashboard: React.FC = () => {
       </div>
 
       {/* Charts */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
         {/* Profit Chart */}
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">تطور الأرباح الأسبوعية</h3>
-          <div className="h-80">
+        <div className="bg-white p-4 sm:p-6 rounded-xl shadow-sm border border-gray-100">
+          <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-4">{t('dashboard.weeklyProfits')}</h3>
+          <div className="h-64 sm:h-80">
             {profitData.some(d => d.profit > 0) ? (
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={profitData}>
                   <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="name" />
-                  <YAxis />
-                  <Tooltip formatter={(value) => [`${value} د.ت`, 'الربح']} />
+                  <XAxis 
+                    dataKey="name" 
+                    fontSize={12}
+                    tick={{ fontSize: 10 }}
+                  />
+                  <YAxis fontSize={12} />
+                  <Tooltip formatter={(value) => [`${value} ${t('currency')}`, t('repairs.profit')]} />
                   <Bar dataKey="profit" fill="#3B82F6" radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             ) : (
               <div className="flex items-center justify-center h-full text-gray-500">
                 <div className="text-center">
-                  <Wrench className="w-12 h-12 mx-auto mb-4 text-gray-300" />
-                  <p>لا توجد بيانات أرباح للعرض</p>
-                  <p className="text-sm">قم بإضافة عمليات إصلاح مكتملة لرؤية الإحصائيات</p>
+                  <Wrench className="w-8 sm:w-12 h-8 sm:h-12 mx-auto mb-4 text-gray-300" />
+                  <p className="text-sm sm:text-base">{t('common.noData')}</p>
                 </div>
               </div>
             )}
@@ -213,9 +222,9 @@ const Dashboard: React.FC = () => {
         </div>
 
         {/* Popular Models */}
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">الموديلات الأكثر إصلاحاً</h3>
-          <div className="h-80">
+        <div className="bg-white p-4 sm:p-6 rounded-xl shadow-sm border border-gray-100">
+          <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-4">{t('dashboard.popularModels')}</h3>
+          <div className="h-64 sm:h-80">
             {popularModels.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
@@ -223,9 +232,10 @@ const Dashboard: React.FC = () => {
                     data={popularModels}
                     cx="50%"
                     cy="50%"
-                    outerRadius={100}
+                    outerRadius={80}
                     dataKey="count"
                     label={({ name, count }) => `${name}: ${count}`}
+                    fontSize={10}
                   >
                     {popularModels.map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={entry.color} />
@@ -237,9 +247,8 @@ const Dashboard: React.FC = () => {
             ) : (
               <div className="flex items-center justify-center h-full text-gray-500">
                 <div className="text-center">
-                  <Package className="w-12 h-12 mx-auto mb-4 text-gray-300" />
-                  <p>لا توجد بيانات موديلات للعرض</p>
-                  <p className="text-sm">قم بإضافة عمليات إصلاح لرؤية الموديلات الأكثر شيوعاً</p>
+                  <Package className="w-8 sm:w-12 h-8 sm:h-12 mx-auto mb-4 text-gray-300" />
+                  <p className="text-sm sm:text-base">{t('common.noData')}</p>
                 </div>
               </div>
             )}
@@ -248,30 +257,29 @@ const Dashboard: React.FC = () => {
       </div>
 
       {/* Common Issues */}
-      <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">الأعطال الأكثر شيوعاً</h3>
+      <div className="bg-white p-4 sm:p-6 rounded-xl shadow-sm border border-gray-100">
+        <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-4">{t('dashboard.commonIssues')}</h3>
         {commonIssues.length > 0 ? (
-          <div className="space-y-4">
+          <div className="space-y-3 sm:space-y-4">
             {commonIssues.map((issue, index) => (
               <div key={index} className="flex items-center justify-between">
-                <span className="text-gray-700 font-medium">{issue.issue}</span>
-                <div className="flex items-center gap-4">
-                  <div className="w-32 bg-gray-200 rounded-full h-2">
+                <span className="text-sm sm:text-base text-gray-700 font-medium truncate flex-1">{issue.issue}</span>
+                <div className="flex items-center gap-2 sm:gap-4 ml-4">
+                  <div className="w-20 sm:w-32 bg-gray-200 rounded-full h-2">
                     <div 
                       className="bg-blue-600 h-2 rounded-full" 
                       style={{ width: `${(issue.count / Math.max(...commonIssues.map(i => i.count))) * 100}%` }}
                     ></div>
                   </div>
-                  <span className="text-sm font-semibold text-gray-900 w-8">{issue.count}</span>
+                  <span className="text-sm font-semibold text-gray-900 w-6 sm:w-8 text-center">{issue.count}</span>
                 </div>
               </div>
             ))}
           </div>
         ) : (
           <div className="text-center py-8 text-gray-500">
-            <TrendingUp className="w-12 h-12 mx-auto mb-4 text-gray-300" />
-            <p>لا توجد بيانات أعطال للعرض</p>
-            <p className="text-sm">قم بإضافة عمليات إصلاح لرؤية الأعطال الأكثر شيوعاً</p>
+            <TrendingUp className="w-8 sm:w-12 h-8 sm:h-12 mx-auto mb-4 text-gray-300" />
+            <p className="text-sm sm:text-base">{t('common.noData')}</p>
           </div>
         )}
       </div>
