@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Plus, Search, Edit, Trash2, Smartphone, Tag } from 'lucide-react';
-import { useBrands, useModels } from '../hooks/useSupabase';
+import { useBrands, useModels } from '../hooks/useFirebaseData';
 import AddBrandModal from '../components/Modals/AddBrandModal';
 import AddModelModal from '../components/Modals/AddModelModal';
 

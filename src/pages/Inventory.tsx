@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Plus, Search, Filter, Edit, Trash2, AlertTriangle, Package, TrendingDown, TrendingUp } from 'lucide-react';
 import AddSparePartModal from '../components/Modals/AddSparePartModal';
-import { useSpareParts } from '../hooks/useSupabase';
+import { useSpareParts } from '../hooks/useFirebaseData';
 
 const Inventory: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Plus, Search, Filter, Eye, Edit, Trash2, FileText, Wrench, CheckCircle, Clock, AlertCircle } from 'lucide-react';
 import AddRepairModal from '../components/Modals/AddRepairModal';
-import { useRepairRequests, useSpareParts } from '../hooks/useSupabase';
+import { useRepairRequests, useSpareParts } from '../hooks/useFirebaseData';
 
 const Repairs: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');

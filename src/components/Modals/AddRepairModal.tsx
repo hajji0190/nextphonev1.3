@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { X, Wrench, Plus, Trash2, AlertTriangle } from 'lucide-react';
-import { useBrands, useModels, useSpareParts } from '../../hooks/useSupabase';
+import { useBrands, useModels, useSpareParts } from '../../hooks/useFirebaseData';
 
 interface AddRepairModalProps {
   isOpen: boolean;

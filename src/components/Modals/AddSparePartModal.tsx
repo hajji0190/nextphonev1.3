@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { X, Package } from 'lucide-react';
-import { useBrands, useModels } from '../../hooks/useSupabase';
+import { useBrands, useModels } from '../../hooks/useFirebaseData';
 
 interface AddSparePartModalProps {
   isOpen: boolean;
