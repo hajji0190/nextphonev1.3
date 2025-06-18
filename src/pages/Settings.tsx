@@ -1,33 +1,50 @@
 import React, { useState, useEffect } from 'react';
 import { Save, Building, Phone, MapPin, MessageSquare } from 'lucide-react';
-import { useWorkshopSettings } from '../hooks/useSupabase';
+import { db } from '../firebase';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
 
-const Settings: React.FC = () => {
-  const { settings, loading, updateSettings } = useWorkshopSettings();
+const WORKSHOP_DOC_ID = "main"; // يمكنك تغيير هذا المعرّف حسب احتياجك
+
+const Settings = () => {
   const [formData, setFormData] = useState({
     name: '',
     address: '',
     phone: '',
     thank_you_message: ''
   });
+  const [loading, setLoading] = useState(true);
   const [saved, setSaved] = useState(false);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    if (settings) {
-      setFormData({
-        name: settings.name,
-        address: settings.address,
-        phone: settings.phone,
-        thank_you_message: settings.thank_you_message
-      });
-    }
-  }, [settings]);
+    const fetchSettings = async () => {
+      setLoading(true);
+      try {
+        const docRef = doc(db, "workshop_settings", WORKSHOP_DOC_ID);
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists()) {
+          setFormData({
+            name: docSnap.data().name || '',
+            address: docSnap.data().address || '',
+            phone: docSnap.data().phone || '',
+            thank_you_message: docSnap.data().thank_you_message || ''
+          });
+        }
+      } catch (error) {
+        alert('حدث خطأ في تحميل الإعدادات');
+        console.error(error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchSettings();
+  }, []);
 
   const handleSave = async () => {
     try {
       setSaving(true);
-      await updateSettings(formData);
+      const docRef = doc(db, "workshop_settings", WORKSHOP_DOC_ID);
+      await setDoc(docRef, formData, { merge: true });
       setSaved(true);
       setTimeout(() => setSaved(false), 3000);
     } catch (error) {
@@ -51,7 +68,6 @@ const Settings: React.FC = () => {
       {/* Header */}
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-gray-900">إعدادات الورشة</h1>
-        
         {saved && (
           <div className="bg-green-100 text-green-800 px-4 py-2 rounded-lg text-sm">
             تم حفظ الإعدادات بنجاح
@@ -65,12 +81,9 @@ const Settings: React.FC = () => {
           <Building className="w-6 h-6 text-blue-600" />
           <h2 className="text-xl font-semibold text-gray-900">معلومات الورشة</h2>
         </div>
-
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              اسم الورشة
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">اسم الورشة</label>
             <input
               type="text"
               value={formData.name}
@@ -79,11 +92,8 @@ const Settings: React.FC = () => {
               placeholder="أدخل اسم الورشة"
             />
           </div>
-
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              رقم الهاتف
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">رقم الهاتف</label>
             <div className="relative">
               <Phone className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
               <input
@@ -95,11 +105,8 @@ const Settings: React.FC = () => {
               />
             </div>
           </div>
-
           <div className="lg:col-span-2">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              العنوان
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">العنوان</label>
             <div className="relative">
               <MapPin className="absolute right-3 top-3 text-gray-400 w-5 h-5" />
               <textarea
@@ -111,11 +118,8 @@ const Settings: React.FC = () => {
               />
             </div>
           </div>
-
           <div className="lg:col-span-2">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              رسالة الشكر
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">رسالة الشكر</label>
             <div className="relative">
               <MessageSquare className="absolute right-3 top-3 text-gray-400 w-5 h-5" />
               <textarea
@@ -131,7 +135,6 @@ const Settings: React.FC = () => {
             </p>
           </div>
         </div>
-
         <div className="flex justify-end mt-6">
           <button
             onClick={handleSave}
@@ -147,23 +150,17 @@ const Settings: React.FC = () => {
       {/* Account Settings */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
         <h2 className="text-xl font-semibold text-gray-900 mb-6">إعدادات الحساب</h2>
-        
         <div className="space-y-4">
           <div className="p-4 bg-gray-50 rounded-lg">
             <h3 className="font-medium text-gray-900 mb-2">إضافة مستخدم جديد</h3>
-            <p className="text-sm text-gray-600 mb-4">
-              يمكن للمدير إضافة فنيين جدد للنظام
-            </p>
+            <p className="text-sm text-gray-600 mb-4">يمكن للمدير إضافة فنيين جدد للنظام</p>
             <button className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors">
               إضافة مستخدم
             </button>
           </div>
-
           <div className="p-4 bg-gray-50 rounded-lg">
             <h3 className="font-medium text-gray-900 mb-2">تغيير كلمة المرور</h3>
-            <p className="text-sm text-gray-600 mb-4">
-              قم بتحديث كلمة المرور الخاصة بك بانتظام
-            </p>
+            <p className="text-sm text-gray-600 mb-4">قم بتحديث كلمة المرور الخاصة بك بانتظام</p>
             <button className="bg-orange-600 text-white px-4 py-2 rounded-lg hover:bg-orange-700 transition-colors">
               تغيير كلمة المرور
             </button>
